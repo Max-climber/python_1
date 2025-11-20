@@ -1,7 +1,8 @@
 import pytest
 import requests
 
-BASE = "https://hd.kinopoisk.ru/api/"
+BASE = "https://www.kinopoisk.ru/api/"
+
 
 
 # --- TEST 1: API отдаёт HTML вместо JSON ---

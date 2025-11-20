@@ -1,100 +1,107 @@
 import pytest
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from conftest import driver  # Импорт фикстуры драйвера из conftest.py
+
+
+BASE_URL = "https://www.kinopoisk.ru/?utm_referrer=www.yandex.ru"
 
 
 # --- TEST 1 ---
 def test_homepage_loads(driver):
     """Проверка загрузки главной страницы"""
-    driver.get("https://hd.kinopoisk.ru/")
+    driver.get(BASE_URL)
 
-    WebDriverWait(driver, 10).until(
-        EC.title_contains("КиноПоиск")
+    # Ожидаем, что сайт загрузился, а не Cloudflare
+    WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "header"))
     )
 
     assert "КиноПоиск" in driver.title
 
-    header = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='header-menu']"))
-    )
-    assert header.is_displayed()
-
 
 # --- TEST 2 ---
 def test_search_film(driver):
-    """Поиск фильма через верхнее меню"""
-    driver.get("https://hd.kinopoisk.ru/")
+    """Поиск фильма"""
+    driver.get(BASE_URL)
 
-    search_btn = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-test='header-search']"))
+    search_input = WebDriverWait(driver, 15).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, "input[name='kp_query']"))
     )
-    search_btn.click()
-
-    search_input = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='search']"))
-    )
-
     search_input.send_keys("Интерстеллар")
 
-    results = WebDriverWait(driver, 10).until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-test='entity-card-title']"))
+    search_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']"))
     )
+    search_button.click()
+
+    # Результаты поиска
+    results = WebDriverWait(driver, 15).until(
+        EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, "div.serp-item__content a.serp-item__title-link")
+        )
+    )
+
     assert len(results) > 0
+    assert "Интерстеллар" in results[0].text
 
 
 # --- TEST 3 ---
 def test_open_first_movie_card(driver):
-    """Открытие карточки первого фильма на главной"""
-    driver.get("https://hd.kinopoisk.ru/")
+    """Открытие первой карточки фильма из рекомендованного блока"""
+    driver.get(BASE_URL)
 
-    cards = WebDriverWait(driver, 15).until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-test='entity-card']"))
+    # Карточки фильмов на главной (ролевая ссылка на фильм)
+    cards = WebDriverWait(driver, 20).until(
+        EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, "a[href*='/film/'][role='link']")
+        )
     )
+
     assert len(cards) > 0
 
+    movie_url = cards[0].get_attribute("href")
     cards[0].click()
 
-    title = WebDriverWait(driver, 15).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='content-title']"))
+    # Заголовок фильма
+    title = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "h1[data-tid='title']"))
     )
+
     assert title.is_displayed()
+    assert movie_url.split("/film/")[1].split("/")[0] in driver.current_url
 
 
 # --- TEST 4 ---
-def test_open_series_from_menu(driver):
-    """Переход в раздел Сериалы через меню"""
-    driver.get("https://hd.kinopoisk.ru/")
+def test_open_series_section(driver):
+    """Переход в раздел Сериалы"""
+    driver.get(BASE_URL)
 
-    menu_items = WebDriverWait(driver, 10).until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-test='header-menu'] a"))
+    series_btn = WebDriverWait(driver, 15).until(
+        EC.element_to_be_clickable((By.LINK_TEXT, "Сериалы"))
     )
-
-    series_btn = next((item for item in menu_items if "Сериалы" in item.text), None)
-    assert series_btn is not None
-
     series_btn.click()
 
-    WebDriverWait(driver, 10).until(
-        EC.url_contains("series")
+    WebDriverWait(driver, 15).until(
+        EC.title_contains("Сериалы")
     )
-    assert "series" in driver.current_url.lower()
+
+    assert "series" in driver.current_url
 
 
 # --- TEST 5 ---
 def test_open_genres_page(driver):
-    """Проверка перехода в раздел Жанры"""
-    driver.get("https://hd.kinopoisk.ru/")
+    """Переход в раздел Жанры"""
+    driver.get(BASE_URL)
 
-    genre_btn = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-test='header-menu'] a[href*='genres']"))
+    genres_btn = WebDriverWait(driver, 15).until(
+        EC.element_to_be_clickable((By.LINK_TEXT, "Жанры"))
     )
-    genre_btn.click()
+    genres_btn.click()
 
-    category_title = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='content-title']"))
+    title = WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "h1[data-tid='title']"))
     )
 
-    assert category_title.is_displayed()
+    assert title.is_displayed()
+    assert "genres" in driver.current_url
