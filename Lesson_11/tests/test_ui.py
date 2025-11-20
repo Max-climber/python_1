@@ -1,92 +1,100 @@
-import json
 import pytest
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from conftest import driver  # Импорт фикстуры драйвера из conftest.py
 
 
-BASE = "https://hd.kinopoisk.ru/api/"
+# --- TEST 1 ---
+def test_homepage_loads(driver):
+    """Проверка загрузки главной страницы"""
+    driver.get("https://hd.kinopoisk.ru/")
 
-
-@pytest.fixture()
-def driver():
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service)
-    driver.maximize_window()
-    yield driver
-    driver.quit()
-
-
-def wait_json(driver):
-    """Ждём появления <pre> с JSON и возвращаем его как dict"""
-    pre = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.TAG_NAME, "pre"))
+    WebDriverWait(driver, 10).until(
+        EC.title_contains("КиноПоиск")
     )
-    return json.loads(pre.text)
+
+    assert "КиноПоиск" in driver.title
+
+    header = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='header-menu']"))
+    )
+    assert header.is_displayed()
 
 
-# --------- 1. Получение списка фильмов --------- #
+# --- TEST 2 ---
+def test_search_film(driver):
+    """Поиск фильма через верхнее меню"""
+    driver.get("https://hd.kinopoisk.ru/")
 
-def test_get_catalog(driver):
-    url = BASE + "v1/content/list?type=movie&page=1&perPage=20"
-    driver.get(url)
+    search_btn = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-test='header-search']"))
+    )
+    search_btn.click()
 
-    data = wait_json(driver)
+    search_input = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='search']"))
+    )
 
-    assert "items" in data
-    assert len(data["items"]) > 0
-    assert "title" in data["items"][0]
+    search_input.send_keys("Интерстеллар")
 
-
-# --------- 2. Поиск фильма --------- #
-
-def test_search_movie(driver):
-    url = BASE + "v1/search?query=Интерстеллар"
-    driver.get(url)
-
-    data = wait_json(driver)
-
-    titles = [item["title"] for item in data.get("items", [])]
-    assert any("Интерстеллар" in title for title in titles)
+    results = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-test='entity-card-title']"))
+    )
+    assert len(results) > 0
 
 
-# --------- 3. Получение карточки фильма --------- #
+# --- TEST 3 ---
+def test_open_first_movie_card(driver):
+    """Открытие карточки первого фильма на главной"""
+    driver.get("https://hd.kinopoisk.ru/")
 
-def test_get_movie_card(driver):
-    movie_id = "258687"
-    url = BASE + f"v1/content/{movie_id}"
-    driver.get(url)
+    cards = WebDriverWait(driver, 15).until(
+        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-test='entity-card']"))
+    )
+    assert len(cards) > 0
 
-    data = wait_json(driver)
+    cards[0].click()
 
-    assert str(data["id"]) == movie_id
-    assert data["title"] == "Интерстеллар"
-    assert "description" in data
-
-
-# --------- 4. Получение жанров --------- #
-
-def test_get_genres(driver):
-    url = BASE + "v1/content/filters/genres"
-    driver.get(url)
-
-    data = wait_json(driver)
-
-    assert "genres" in data
-    assert len(data["genres"]) > 0
-    assert any(g["name"] == "Фантастика" for g in data["genres"])
+    title = WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='content-title']"))
+    )
+    assert title.is_displayed()
 
 
-# --------- 5. Негативный тест на авторизацию --------- #
+# --- TEST 4 ---
+def test_open_series_from_menu(driver):
+    """Переход в раздел Сериалы через меню"""
+    driver.get("https://hd.kinopoisk.ru/")
 
-def test_auth_wrong_credentials(driver):
-    url = BASE + "v1/auth/login?login=wrong_user&password=wrong_password"
-    driver.get(url)
+    menu_items = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[data-test='header-menu'] a"))
+    )
 
-    data = wait_json(driver)
+    series_btn = next((item for item in menu_items if "Сериалы" in item.text), None)
+    assert series_btn is not None
 
-    assert "error" in data
-    assert data["error"] == "invalid_credentials"
+    series_btn.click()
+
+    WebDriverWait(driver, 10).until(
+        EC.url_contains("series")
+    )
+    assert "series" in driver.current_url.lower()
+
+
+# --- TEST 5 ---
+def test_open_genres_page(driver):
+    """Проверка перехода в раздел Жанры"""
+    driver.get("https://hd.kinopoisk.ru/")
+
+    genre_btn = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-test='header-menu'] a[href*='genres']"))
+    )
+    genre_btn.click()
+
+    category_title = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='content-title']"))
+    )
+
+    assert category_title.is_displayed()
