@@ -8,7 +8,7 @@ class Config:
     """Конфигурация приложения"""
     # Telegram
     BOT_TOKEN: str = "8549106969:AAFYsQtdUG79d_kuLbXiLcLzb0w4gp9qOho"
-    WEBAPP_URL: str = "https://your-domain.com/webapp/"  # Замените на свой URL
+    WEBAPP_URL: str = "https://github.com/erupto15/python_1/tree/282f1001d0f6f6c6953a52315c681b2ad36fcdcd/climbing-guidebook"  # Замените на свой URL
 
     # База данных (опционально)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///climbing.db")
